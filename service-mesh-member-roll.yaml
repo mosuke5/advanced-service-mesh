@@ -1,0 +1,30 @@
+- hosts: localhost
+  tasks:
+  - name: Add bookinfo ns to istio service member
+    k8s:
+      state: present
+      namespace: bookretail-istio-system
+      src: manifests/service-mesh-member-roll.yaml
+  - name: Fetch all deployments in bookinfo namespace
+    set_fact:
+      deployments: "{{ lookup('k8s', kind='Deployment', namespace='bookinfo') }}"
+    register: deployments
+  - debug:
+      msg: "deploy: {{ item.metadata.name }}"
+    loop: "{{ deployments }}"
+  - name: Add annotations to deployments
+    k8s:
+      state: present
+      namespace: bookinfo
+      merge_type: merge
+      definition:
+        apiversion: apps/v1
+        kind: Deployment
+        metadata:
+          name: "{{ item.metadata.name }}"
+        spec:
+          template:
+            metadata:
+              annotations:
+                sidecar.istio.io/inject: "true"
+    loop: "{{ deployments }}"

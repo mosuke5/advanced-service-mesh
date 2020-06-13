@@ -1,0 +1,7 @@
+kind: ServiceMeshMemberRoll
+metadata:
+  name: default
+spec:
+  members:
+    - bookinfo
+    - user1-tutorial

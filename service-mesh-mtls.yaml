@@ -1,0 +1,114 @@
+- hosts: localhost
+  tasks:
+  - name: Create gateway 
+    k8s:
+      state: present
+      namespace: bookinfo
+      src: manifests/wildcard-gateway.yaml
+  - name: Fetch all services in bookinfo namespace
+    set_fact:
+      services: "{{ lookup('k8s', kind='Service', namespace='bookinfo') }}"
+    register: services
+  - name: Create policies for enabling mtls
+    k8s:
+      state: present
+      namespace: bookinfo
+      definition:
+        apiVersion: authentication.istio.io/v1alpha1
+        kind: Policy
+        metadata:
+          name: "{{ item.metadata.name }}-mtls"
+        spec:
+          peers:
+          - mtls:
+              mode: STRICT
+          targets:
+          - name: "{{ item.metadata.name }}"
+    loop: "{{ services }}"
+  - name: Create destinationrules
+    k8s:
+      state: present
+      namespace: bookinfo
+      definition:
+        apiVersion: networking.istio.io/v1alpha3
+        kind: DestinationRule
+        metadata:
+          name: "{{ item.metadata.name }}-mtls"
+        spec:
+          host: "{{ item.metadata.name }}.bookinfo.svc.cluster.local"
+          trafficPolicy:
+            tls:
+              mode: ISTIO_MUTUAL
+    loop: "{{ services }}"
+  - name: Create virtualservice
+    k8s:
+      state: present
+      namespace: bookinfo
+      definition:
+        apiVersion: networking.istio.io/v1alpha3
+        kind: VirtualService
+        metadata:
+          name: product-page-virtualservice
+        spec:
+          hosts:
+            - productpage.bookinfo.apps.cluster-0a21.0a21.sandbox824.opentlc.com
+          gateways:
+            - bookinfo-wildcard-gateway
+            #- bookinfo-wildcard-gateway.bookretail-istio-system.svc.cluster.local
+          http:
+          - match:
+            - uri:
+                prefix: /
+            route:
+            - destination:
+                port:
+                  number: 9080
+                host: productpage.bookinfo.svc.cluster.local
+  - name: Create http route for productpage
+    k8s:
+      state: present
+      namespace: bookretail-istio-system
+      definition:
+        apiVersion: route.openshift.io/v1
+        kind: Route
+        metadata:
+          annotations:
+            openshift.io/host.generated: "true"
+          labels:
+            app: productpage-service
+          name: productpage-service-gateway-http
+        spec:
+          host: productpage.bookinfo.apps.cluster-0a21.0a21.sandbox824.opentlc.com
+          port:
+            targetPort: https
+          tls:
+            termination: passthrough
+          to:
+            kind: Service
+            name: istio-ingressgateway
+            weight: 100
+          wildcardPolicy: None
+  #- name: Create https route for productpage
+  #  k8s:
+  #    state: present
+  #    namespace: bookretail-istio-system
+  #    definition:
+  #      apiVersion: route.openshift.io/v1
+  #      kind: Route
+  #      metadata:
+  #        annotations:
+  #          openshift.io/host.generated: "true"
+  #        labels:
+  #          app: productpage-service
+  #        name: productpage-service-gateway-https
+  #      spec:
+  #        host: productpage-bookinfo.apps.cluster-0a21.0a21.sandbox824.opentlc.com
+  #        port:
+  #          targetPort: https
+  #        tls:
+  #          termination: passthrough
+  #        to:
+  #          kind: Service
+  #          name: istio-ingressgateway
+  #          weight: 100
+  #        wildcardPolicy: None
