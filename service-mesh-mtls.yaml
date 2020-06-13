@@ -88,27 +88,3 @@
             name: istio-ingressgateway
             weight: 100
           wildcardPolicy: None
-  #- name: Create https route for productpage
-  #  k8s:
-  #    state: present
-  #    namespace: bookretail-istio-system
-  #    definition:
-  #      apiVersion: route.openshift.io/v1
-  #      kind: Route
-  #      metadata:
-  #        annotations:
-  #          openshift.io/host.generated: "true"
-  #        labels:
-  #          app: productpage-service
-  #        name: productpage-service-gateway-https
-  #      spec:
-  #        host: productpage-bookinfo.apps.cluster-0a21.0a21.sandbox824.opentlc.com
-  #        port:
-  #          targetPort: https
-  #        tls:
-  #          termination: passthrough
-  #        to:
-  #          kind: Service
-  #          name: istio-ingressgateway
-  #          weight: 100
-  #        wildcardPolicy: None
