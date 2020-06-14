@@ -4,4 +4,3 @@ metadata:
 spec:
   members:
     - bookinfo
-    - user1-tutorial

@@ -1,0 +1,16 @@
+
+[ req ]
+req_extensions     = req_ext
+distinguished_name = req_distinguished_name
+prompt             = no
+
+[req_distinguished_name]
+commonName="{{ application_project }}.apps.{{ base_domain }}"
+
+[req_ext]
+subjectAltName   = @alt_names
+
+[alt_names]
+DNS.1  = "{{ application_project }}.apps.{{ base_domain }}"
+DNS.2  = "*.{{ application_project }}.apps.{{ base_domain }}"
+

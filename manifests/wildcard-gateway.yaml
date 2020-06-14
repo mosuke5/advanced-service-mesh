@@ -17,4 +17,4 @@ spec:
       serverCertificate: /etc/istio/ingressgateway-certs/tls.crt
       minProtocolVersion: TLSV1_2
     hosts:
-    - "*.bookinfo.apps.cluster-0a21.0a21.sandbox824.opentlc.com"
+    - "*.bookinfo.apps.cluster-01f0.01f0.sandbox936.opentlc.com"

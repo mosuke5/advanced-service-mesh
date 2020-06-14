@@ -1,9 +1,36 @@
 - hosts: localhost
+  vars:
+    application_project: bookinfo
+    istio_project: bookretail-istio-system
+    base_domain: cluster-01f0.01f0.sandbox936.opentlc.com
   tasks:
+  - name: Create cert.cfg
+    template:
+      src: templates/cert.cfg.j2
+      dest: tmp/cert.cfg
+  - name: Generate openssl certificate and key
+    command: "openssl req -x509 -config tmp/cert.cfg -extensions req_ext -nodes -days 730 -newkey rsa:2048 -sha256 -keyout tmp/tls.key -out tmp/tls.crt"
+  - name: Create tls secret to openshift cluster
+    command: "oc create secret tls istio-ingressgateway-certs --cert tmp/tls.crt --key tmp/tls.key -n {{ istio_project }}"
+  - name: Add annotations to deployments
+    k8s:
+      state: present
+      namespace: "{{ istio_project }}"
+      merge_type: merge
+      definition:
+        apiversion: apps/v1
+        kind: Deployment
+        metadata:
+          name: istio-ingressgateway
+        spec:
+          template:
+            metadata:
+              annotations:
+                kubectl.kubernetes.io/restartedAt: "{{ansible_date_time.iso8601}}"
   - name: Create gateway 
     k8s:
       state: present
-      namespace: bookinfo
+      namespace: "{{ application_project }}"
       src: manifests/wildcard-gateway.yaml
   - name: Fetch all services in bookinfo namespace
     set_fact:
@@ -12,7 +39,7 @@
   - name: Create policies for enabling mtls
     k8s:
       state: present
-      namespace: bookinfo
+      namespace: "{{ application_project }}"
       definition:
         apiVersion: authentication.istio.io/v1alpha1
         kind: Policy
@@ -28,7 +55,7 @@
   - name: Create destinationrules
     k8s:
       state: present
-      namespace: bookinfo
+      namespace: "{{ application_project }}"
       definition:
         apiVersion: networking.istio.io/v1alpha3
         kind: DestinationRule
@@ -43,7 +70,7 @@
   - name: Create virtualservice
     k8s:
       state: present
-      namespace: bookinfo
+      namespace: "{{ application_project }}"
       definition:
         apiVersion: networking.istio.io/v1alpha3
         kind: VirtualService
@@ -51,10 +78,9 @@
           name: product-page-virtualservice
         spec:
           hosts:
-            - productpage.bookinfo.apps.cluster-0a21.0a21.sandbox824.opentlc.com
+            - productpage.{{ application_project }}.apps.{{ base_domain }}
           gateways:
             - bookinfo-wildcard-gateway
-            #- bookinfo-wildcard-gateway.bookretail-istio-system.svc.cluster.local
           http:
           - match:
             - uri:
@@ -67,7 +93,7 @@
   - name: Create http route for productpage
     k8s:
       state: present
-      namespace: bookretail-istio-system
+      namespace: "{{ istio_project }}"
       definition:
         apiVersion: route.openshift.io/v1
         kind: Route
@@ -78,7 +104,7 @@
             app: productpage-service
           name: productpage-service-gateway-http
         spec:
-          host: productpage.bookinfo.apps.cluster-0a21.0a21.sandbox824.opentlc.com
+          host: productpage.{{ application_project }}.apps.{{ base_domain }}
           port:
             targetPort: https
           tls:
